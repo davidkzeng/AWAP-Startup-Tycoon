@@ -15,7 +15,10 @@ class Player(BasePlayer):
     def __init__(self, state):
         graph = state.get_graph()
         self.numNodes = len(graph.nodes())
-        self.shortPath = nx.all_pairs_dijkstra_path_length(graph)
+        self.shortPath = []
+        calcFirst = min(200,self.numNodes)
+        for i in range(calcFirst):
+            self.shortPath.append(nx.single_source_dijkstra_path_length(graph, i))
         maxWait = int(20/ORDER_CHANCE)
         self.waitTime = min(40,maxWait)
 
@@ -94,6 +97,7 @@ class Player(BasePlayer):
             closestStat = [0 for x in range(len(pending_orders))]
             closestOrder = [100000 for x in range(len(self.stations))]
             closestIndex = [-1 for x in range(len(self.stations))]
+            ordersFilled = [False for x in range(len(pending_orders))]
             for i in range(len(pending_orders)): # check for all stations
                 for j in range(len(self.stations)):
                     station = self.stations[j]
@@ -114,7 +118,16 @@ class Player(BasePlayer):
                         if j == len(self.stations) - 1:
                             self.lastStationProfit += max(0,(state.money_from(x) - len(path)*DECAY_FACTOR))
                         commands.append(self.send_command(x, path))
-            
+                        ordersFilled[closestIndex[j]] = True
+            for i in range(len(pending_orders)):
+                if not ordersFilled[i]:
+                    x = pending_orders[i]
+                    j = closestStat[i]
+                    path = nx.shortest_path(graph,self.stations[j],x.get_node())
+                    if self.path_is_valid(state,path):
+                        if j == len(self.stations) - 1:
+                            self.lastStationProfit += max(0,(state.money_from(x) - len(path)*DECAY_FACTOR))
+                        commands.append(self.send_command(x,path))
 
         return commands
 

@@ -56,5 +56,5 @@ def generate_graph():
     # Try these included graphs! Play around with the constants!
     # Feel free to define your own graph for testing.
 
-    return nx.connected_watts_strogatz_graph(100, 4, 1, seed=GRAPH_SEED)
-    #return grid_graph()
+    #return nx.connected_watts_strogatz_graph(100, 4, 1, seed=GRAPH_SEED)
+    return grid_graph()
