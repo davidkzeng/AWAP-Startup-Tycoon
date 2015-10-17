@@ -114,6 +114,7 @@ class Player(BasePlayer):
                         if j == len(self.stations) - 1:
                             self.lastStationProfit += max(0,(state.money_from(x) - len(path)*DECAY_FACTOR))
                         commands.append(self.send_command(x, path))
+            
 
         return commands
 
