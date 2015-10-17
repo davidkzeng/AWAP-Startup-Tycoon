@@ -24,6 +24,8 @@ class Player(BasePlayer):
         self.buildCost = INIT_BUILD_COST
         self.lastBuild = 0
         self.timeToDiss = int(math.ceil(SCORE_MEAN / DECAY_FACTOR))
+        self.totalProfit = 0
+        self.profitSinceLast = 0
         """
         Initializes your Player. You can set up persistent state, do analysis
         on the input graph, engage in whatever pre-computation you need. This
@@ -100,7 +102,7 @@ class Player(BasePlayer):
                     closestIndex[closestStat[i]] = i
 
             for j in range(len(self.stations)):
-                if not closestIndex[j] == -1:
+                if not closestIndex[j] == -1 and closestOrder[j] < self.timeToDiss:
                     x = pending_orders[closestIndex[j]]
                     path = nx.shortest_path(graph, self.stations[j], x.get_node())
                     if self.path_is_valid(state, path):
