@@ -1,5 +1,6 @@
 import networkx as nx
 import random
+import math
 from base_player import BasePlayer
 from settings import *
 
@@ -22,6 +23,7 @@ class Player(BasePlayer):
         self.stations = []
         self.buildCost = INIT_BUILD_COST
         self.lastBuild = 0
+        self.timeToDiss = int(math.ceil(SCORE_MEAN / DECAY_FACTOR))
         """
         Initializes your Player. You can set up persistent state, do analysis
         on the input graph, engage in whatever pre-computation you need. This
@@ -110,17 +112,20 @@ class Player(BasePlayer):
         valList = [0 for x in range(self.numNodes)]
         for x in satisfyList:
             for a in range(self.numNodes):
-                if not self.shortPath[x][a] == 0:
-                    valList[a] += (1/self.shortPath[x][a])
-                else:
+                #if self.shortPath[x][a] <= ORDER_VAR:
+                    #valList[a] += math.exp((-1 * math.pow(self.shortPath[x][a],2))/(2*math.pow(int(ORDER_VAR),2)))/ORDER_VAR
+                if self.shortPath[x][a] < self.timeToDiss and not self.shortPath[x][a] == 0:
+                    valList[a] += 1/self.shortPath[x][a]
+                elif self.shortPath[x][a] == 0:
                     valList[a] += 2
+                #valList[a] += (SCORE_MEAN - (self.shortPath[x][a] * DECAY_FACTOR))/SCORE_MEAN
+
         maxInd = -1
         maxVal = 0
         for a in range(self.numNodes): #find station that could serve the most nodes that are closest
             if valList[a] > maxVal:
                 maxInd = a
                 maxVal = valList[a]
-
         return maxInd
 
     def buildStation(self, state, graph, commands):
