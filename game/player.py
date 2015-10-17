@@ -79,24 +79,30 @@ class Player(BasePlayer):
         if curTime - self.lastBuild > (self.waitTime / 2) and state.get_money() > self.buildCost and len(self.stations)<5:
             self.buildStation(state,graph,commands)
 
-        minLength = 1000000; #arbitrary high value
-        minOrd = 0
-        closestStat = 0
+
         if len(self.stations) > 0: #do not bother if we have no stations
+            minLength = [100000 for x in range(len(pending_orders))] #arbitrary high value
+            closestStat = [0 for x in range(len(pending_orders))]
+            closestOrder = [100000 for x in range(len(self.stations))]
+            closestIndex = [-1 for x in range(len(self.stations))]
             for i in range(len(pending_orders)): # check for all stations
-                for station in self.stations:
+                for j in range(len(self.stations)):
+                    station = self.stations[j]
                     x = pending_orders[i]
                     path = nx.shortest_path(graph, station, x.get_node())
-                    if(len(path) < minLength):
-                        minOrd = i
-                        minLength = len(path)
-                        closestStat = station
+                    if(len(path) < minLength[i]):
+                        minLength[i] = len(path)
+                        closestStat[i] = j
+                if minLength[i] < closestOrder[closestStat[i]]:
+                    closestOrder[closestStat[i]] = minLength[i]
+                    closestIndex[closestStat[i]] = i
 
-            if len(pending_orders) != 0:
-                x = pending_orders[minOrd]
-                path = nx.shortest_path(graph, closestStat, x.get_node())
-                if self.path_is_valid(state, path):
-                    commands.append(self.send_command(x, path))
+            for j in range(len(self.stations)):
+                if not closestIndex[j] == -1:
+                    x = pending_orders[closestIndex[j]]
+                    path = nx.shortest_path(graph, self.stations[j], x.get_node())
+                    if self.path_is_valid(state, path):
+                        commands.append(self.send_command(x, path))
 
         return commands
 
