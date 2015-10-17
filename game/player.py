@@ -15,10 +15,10 @@ class Player(BasePlayer):
     def __init__(self, state):
         graph = state.get_graph()
         self.numNodes = len(graph.nodes())
-        self.shortPath = []
-        calcFirst = min(200,self.numNodes)
-        for i in range(calcFirst):
-            self.shortPath.append(nx.single_source_dijkstra_path_length(graph, i))
+        self.shortPath = [None for x in range(self.numNodes)]
+        #calcFirst = min(200,self.numNodes)
+        #for i in range(calcFirst):
+         #   self.shortPath[i] = nx.single_source_dijkstra_path_length(graph, i)
         maxWait = int(20/ORDER_CHANCE)
         self.waitTime = min(40,maxWait)
 
@@ -73,6 +73,10 @@ class Player(BasePlayer):
         commands = []
         self.totalProfit = state.get_money() + self.stationMoneySpent
         pending_orders = state.get_pending_orders()
+        for order in pending_orders:
+            x = order.get_node()
+            if self.shortPath[x] is None:
+                self.shortPath[x] = nx.single_source_dijkstra_path_length(graph, x)
         if not self.has_built_station:
             for x in pending_orders:
                 if x.get_time_created() == curTime:
