@@ -25,7 +25,9 @@ class Player(BasePlayer):
         self.lastBuild = 0
         self.timeToDiss = int(math.ceil(SCORE_MEAN / DECAY_FACTOR))
         self.totalProfit = 0
-        self.profitSinceLast = 0
+        self.lastStationProfit = 0
+
+        self.stationMoneySpent = 0
         """
         Initializes your Player. You can set up persistent state, do analysis
         on the input graph, engage in whatever pre-computation you need. This
@@ -66,7 +68,7 @@ class Player(BasePlayer):
         graph = state.get_graph()
         curTime = state.get_time()
         commands = []
-
+        self.totalProfit = state.get_money() + self.stationMoneySpent
         pending_orders = state.get_pending_orders()
         if not self.has_built_station:
             for x in pending_orders:
@@ -80,8 +82,11 @@ class Player(BasePlayer):
         if not self.has_built_station and curTime > self.waitTime:
             self.buildStation(state,graph,commands)
 
-        if curTime - self.lastBuild > (self.waitTime / 2) and state.get_money() > self.buildCost and len(self.stations)<5:
-            self.buildStation(state,graph,commands)
+        if curTime - self.lastBuild > self.waitTime and state.get_money() > self.buildCost:
+            estProfit = self.lastStationProfit/ (curTime - self.lastBuild)
+            estProfit *= (1000 - curTime)
+            if estProfit > self.buildCost:
+                self.buildStation(state,graph,commands)
 
 
         if len(self.stations) > 0: #do not bother if we have no stations
@@ -106,6 +111,8 @@ class Player(BasePlayer):
                     x = pending_orders[closestIndex[j]]
                     path = nx.shortest_path(graph, self.stations[j], x.get_node())
                     if self.path_is_valid(state, path):
+                        if j == len(self.stations) - 1:
+                            self.lastStationProfit += max(0,(state.money_from(x) - len(path)*DECAY_FACTOR))
                         commands.append(self.send_command(x, path))
 
         return commands
@@ -114,12 +121,12 @@ class Player(BasePlayer):
         valList = [0 for x in range(self.numNodes)]
         for x in satisfyList:
             for a in range(self.numNodes):
-                #if self.shortPath[x][a] <= ORDER_VAR:
-                    #valList[a] += math.exp((-1 * math.pow(self.shortPath[x][a],2))/(2*math.pow(int(ORDER_VAR),2)))/ORDER_VAR
-                if self.shortPath[x][a] < self.timeToDiss and not self.shortPath[x][a] == 0:
-                    valList[a] += 1/self.shortPath[x][a]
-                elif self.shortPath[x][a] == 0:
-                    valList[a] += 2
+                if self.shortPath[x][a] <= ORDER_VAR and self.shortPath[x][a] < self.timeToDiss:
+                    valList[a] += math.exp((-1 * math.pow(self.shortPath[x][a],2))/(2*math.pow(int(ORDER_VAR),2)))/ORDER_VAR
+                #if self.shortPath[x][a] < self.timeToDiss and not self.shortPath[x][a] == 0:
+                #    valList[a] += 1/self.shortPath[x][a]
+                #elif self.shortPath[x][a] == 0:
+                #    valList[a] += 2
                 #valList[a] += (SCORE_MEAN - (self.shortPath[x][a] * DECAY_FACTOR))/SCORE_MEAN
 
         maxInd = -1
@@ -138,6 +145,8 @@ class Player(BasePlayer):
                 self.stations.append(stat) 
                 commands.append(self.build_command(stat))
                 self.has_built_station = True
+                self.stationMoneySpent += self.buildCost
                 self.buildCost *= BUILD_FACTOR
                 self.unreached = []
                 self.lastBuild = state.get_time()
+                self.lastStationProfit = 0
