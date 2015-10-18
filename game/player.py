@@ -19,7 +19,7 @@ class Player(BasePlayer):
         #calcFirst = min(200,self.numNodes)
         #for i in range(calcFirst):
          #   self.shortPath[i] = nx.single_source_dijkstra_path_length(graph, i)
-        maxWait = int(20/ORDER_CHANCE)
+        maxWait = int(10/ORDER_CHANCE)
         self.waitTime = min(40,maxWait)
 
         self.unreached = []
@@ -128,10 +128,11 @@ class Player(BasePlayer):
                     x = pending_orders[i]
                     j = closestStat[i]
                     path = nx.shortest_path(graph,self.stations[j],x.get_node())
-                    if self.path_is_valid(state,path):
-                        if j == len(self.stations) - 1:
-                            self.lastStationProfit += max(0,(state.money_from(x) - len(path)*DECAY_FACTOR))
-                        commands.append(self.send_command(x,path))
+                    if len(path) < self.timeToDiss:
+                        if self.path_is_valid(state,path):
+                            if j == len(self.stations) - 1:
+                                self.lastStationProfit += max(0,(state.money_from(x) - len(path)*DECAY_FACTOR))
+                            commands.append(self.send_command(x,path))
 
         return commands
 

@@ -13,6 +13,23 @@ from threading import Thread
 from settings import *
 from graphs import generate_graph
 
+import ctypes
+
+def terminate_thread(thread):
+    if not thread.isAlive():
+        return
+
+    exc = ctypes.py_object(SystemExit)
+    res = ctypes.pythonapi.PyThreadState_SetAsyncExc(
+        ctypes.c_long(thread.ident), exc)
+    if res == 0:
+        raise ValueError("nonexistent thread id")
+    elif res > 1:
+        # """if it returns a number greater than one, you're in trouble,
+        # and you should call it again with exc=NULL to revert the effect"""
+        ctypes.pythonapi.PyThreadState_SetAsyncExc(thread.ident, None)
+        raise SystemError("PyThreadState_SetAsyncExc failed")
+
 def timeout(timeout):
     def deco(func):
         @functools.wraps(func)
@@ -25,13 +42,13 @@ def timeout(timeout):
                     log.error(traceback.format_exc(e))
                     res[0] = e
             t = Thread(target=newFunc)
-            t.daemon = True
             try:
                 t.start()
                 t.join(timeout)
             except Exception, je:
                 print 'error starting thread'
                 raise je
+            terminate_thread(t)
             ret = res[0]
             if isinstance(ret, BaseException):
                 raise ret
@@ -40,10 +57,13 @@ def timeout(timeout):
     return deco
 
 class Game:
-    def __init__(self, player_module_path):
+    def __init__(self, player_module_path, seed):
         log.basicConfig(level=LOG_LEVEL,
                         format='%(levelname)7s:%(filename)s:%(lineno)03d :: %(message)s')
+
         self.random = random.Random()
+        self.random.seed(seed)
+
         self.state = State(generate_graph())
         G = self.state.get_graph()
         for (u, v) in G.edges():
@@ -59,14 +79,14 @@ class Game:
         func = timeout(timeout=INIT_TIMEOUT)(initialize_player)
         try:
             player = func(deepcopy(self.state))
-        except:
+        except Exception as e:
+            log.error(traceback.format_exc(e))
             exit()
 
         self.player = player
-        self.random.seed('I am an order seed!')
 
         hubs = deepcopy(G.nodes())
-        random.shuffle(hubs)
+        self.random.shuffle(hubs)
         self.hubs = hubs[:HUBS]
 
     def to_dict(self):
@@ -168,6 +188,14 @@ class Game:
                 self.state.incr_money(-cost)
                 G.node[node]['is_station'] = True
 
+                on_node = filter(lambda (i, x): x.get_node() == node,
+                                 enumerate(self.state.get_pending_orders()))
+                indices = map(lambda (i, x): i, on_node)
+                for (_, order) in on_node:
+                    self.state.incr_money(self.state.money_from(order))
+                self.state.pending_orders = [order for i, order in enumerate(self.state.get_pending_orders()) if i not in indices]
+
+
             # Satisfying an order ("send"ing a train)
             elif command_type == 'send':
                 if 'order' not in command or 'path' not in command:
@@ -181,10 +209,17 @@ class Game:
                     continue
 
                 pending_orders = self.state.get_pending_orders()
+                found = False
                 for i in range(0, len(pending_orders)):
                     if pending_orders[i].id == order.id:
+                        order = pending_orders[i]
                         del(pending_orders[i])
+                        found = True
                         break
+
+                if not found:
+                    log.warning("Attempted to start an order %s that doesn't exist" % order)
+                    continue
 
                 self.state.get_active_orders().append((order, path))
 
@@ -232,9 +267,12 @@ class Game:
         self.state.pending_orders = filter(positive, self.state.get_pending_orders())
 
         func = timeout(timeout=STEP_TIMEOUT)(self.player.step)
+        state_copy = deepcopy(self.state)
+        state_copy.graph = state_copy.graph.copy()
         try:
-            commands = func(deepcopy(self.state))
-        except:
+            commands = func(state_copy)
+        except Exception as e:
+            log.error(traceback.format_exc(e))
             commands = []
 
         self.process_commands(commands)
